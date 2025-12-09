@@ -142,7 +142,7 @@ class AstCreator(
       case staticStmt: PhpStaticStmt       => astsForStaticStmt(staticStmt)
       case unhandled =>
         logger.error(s"Unhandled stmt $unhandled in $relativeFileName")
-        ???
+        Ast(unknownNode(unhandled, code(unhandled))) :: Nil
     }
   }
 
@@ -212,12 +212,51 @@ class AstCreator(
   }
 
   private def astforTraitUseStmt(stmt: PhpTraitUseStmt): Ast = {
-    // TODO Actually implement this
-    logger.debug(
-      s"Trait use statement encountered. This is not yet supported. Location: $relativeFileName:${line(stmt)}"
-    )
+    // Create IMPORT nodes for each trait being used
+    val traitImports = stmt.traits.map { traitName =>
+      val importCode = s"use ${traitName.name}"
+      val importNode = NewImport()
+        .importedEntity(traitName.name)
+        .importedAs(traitName.name.split("\\\\").last)
+        .isExplicit(true)
+        .code(importCode)
+      Ast(importNode)
+    }
 
-    Ast(unknownNode(stmt, code(stmt)))
+    // Handle trait adaptations (aliases and precedence rules)
+    val adaptationAsts = stmt.adaptations.map {
+      case alias: PhpAliasAdaptation =>
+        // use TraitA { methodA as protected newMethod; }
+        val traitPart  = alias.traitName.map(t => s"${t.name}::").getOrElse("")
+        val methodName = alias.methodName.name
+        val modPart    = alias.newModifier.map(m => s" $m").getOrElse("")
+        val aliasPart  = alias.newName.map(n => s" ${n.name}").getOrElse("")
+        val aliasCode  = s"$traitPart$methodName as$modPart$aliasPart"
+
+        // Create an annotation-like node to represent the adaptation
+        val annotationNode = NewAnnotation()
+          .code(aliasCode)
+          .name("TraitAlias")
+          .fullName(s"${traitPart}$methodName")
+        line(alias).foreach(annotationNode.lineNumber(_))
+        column(alias).foreach(annotationNode.columnNumber(_))
+        Ast(annotationNode)
+
+      case prec: PhpPrecedenceAdaptation =>
+        // use TraitA, TraitB { TraitA::method insteadof TraitB; }
+        val insteadOfPart = prec.insteadOf.map(_.name).mkString(", ")
+        val precCode      = s"${prec.traitName.name}::${prec.methodName.name} insteadof $insteadOfPart"
+
+        val annotationNode = NewAnnotation()
+          .code(precCode)
+          .name("TraitPrecedence")
+          .fullName(s"${prec.traitName.name}::${prec.methodName.name}")
+        line(prec).foreach(annotationNode.lineNumber(_))
+        column(prec).foreach(annotationNode.columnNumber(_))
+        Ast(annotationNode)
+    }
+
+    wrapMultipleInBlock(traitImports ++ adaptationAsts, line(stmt))
   }
 
   private def astForUseUse(stmt: PhpUseUse, namePrefix: String = ""): Ast = {

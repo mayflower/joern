@@ -358,7 +358,13 @@ trait AstForTypesCreator(implicit withSchemaValidation: ValidationMode) { this: 
       else
         s" implements ${stmt.implementedInterfaces.map(_.name).mkString(", ")}"
 
-    s"${stmt.classLikeType} ${name.name}$extendsString$implementsString"
+    // Include class modifiers like readonly, abstract, final in code representation
+    val modifiersString = stmt.modifiers match {
+      case Nil  => ""
+      case mods => s"${mods.map(_.toLowerCase).mkString(" ")} "
+    }
+
+    s"$modifiersString${stmt.classLikeType} ${name.name}$extendsString$implementsString"
   }
 
   private def astsForConstStmt(stmt: PhpConstStmt): List[Ast] = {

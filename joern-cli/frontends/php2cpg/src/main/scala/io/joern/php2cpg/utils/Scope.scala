@@ -281,7 +281,7 @@ class Scope(summary: Map[String, Seq[SymbolSummary]] = Map.empty)
     def determineUnresolvedImport(imporT: NewImport): Option[Seq[SymbolSummary]] = {
       imporT.code match {
         case s"use function $_" => imporT.importedEntity.map(x => PhpFunction(x) :: Nil)
-        case s"use const $_"    => None // TODO: We don't model constants yet
+        case s"use const $_"    => imporT.importedEntity.map(x => PhpConstant(x) :: Nil)
         case s"use $_"          => imporT.importedEntity.map(x => PhpClass(x) :: Nil)
         case _                  => None
       }

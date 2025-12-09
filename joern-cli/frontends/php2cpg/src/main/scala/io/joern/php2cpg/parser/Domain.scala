@@ -27,7 +27,8 @@ object Domain {
 
   object PhpOperators {
     // TODO Decide which of these should be moved to codepropertygraph
-    val coalesceOp     = "<operator>.coalesce"
+    val variableVariable = "<operator>.variableVariable"
+    val coalesceOp       = "<operator>.coalesce"
     val concatOp       = "<operator>.concat"
     val identicalOp    = "<operator>.identical"
     val logicalXorOp   = "<operator>.logicalXor"
@@ -372,6 +373,9 @@ object Domain {
 
   sealed trait PhpExpr extends PhpStmt
 
+  /** Placeholder for unrecognized expression types - allows graceful degradation instead of crashing */
+  final case class PhpUnhandledExpr(nodeType: String, attributes: PhpAttributes) extends PhpExpr
+
   final case class PhpNewExpr(className: PhpNode, args: List[PhpArgument], attributes: PhpAttributes) extends PhpExpr
 
   final case class PhpIncludeExpr(expr: PhpExpr, includeType: String, attributes: PhpAttributes) extends PhpExpr
@@ -605,7 +609,7 @@ object Domain {
         PhpFile(children)
       case unhandled =>
         logger.error(s"Found unhandled type in readFile: ${unhandled.getClass} with value $unhandled")
-        ???
+        PhpFile(Nil)
     }
   }
 
@@ -651,7 +655,7 @@ object Domain {
       case "Stmt_TraitUse"     => readTraitUse(json)
       case unhandled =>
         logger.error(s"Found unhandled stmt type: $unhandled")
-        ???
+        NopStmt(PhpAttributes(json))
     }
   }
 
@@ -1082,7 +1086,7 @@ object Domain {
 
       case unhandled =>
         logger.error(s"Found unhandled expr type: $unhandled")
-        ???
+        PhpUnhandledExpr(unhandled, PhpAttributes(json))
     }
   }
 
@@ -1275,7 +1279,7 @@ object Domain {
       case stmts: Arr => stmts.arr.map(readStmt).toList
       case unhandled =>
         logger.warn(s"Unhandled namespace stmts type $unhandled")
-        ???
+        Nil
     }
 
     PhpNamespaceStmt(name, stmts, PhpAttributes(json))
@@ -1436,24 +1440,35 @@ object Domain {
 
       case unhandled =>
         logger.error(s"Found unhandled name type $unhandled: $json")
-        ??? // TODO: other matches are possible?
+        PhpNameExpr("UNKNOWN", PhpAttributes(json))
     }
   }
 
-  /** One of Identifier, Name, or Complex Type (Nullable, Intersection, or Union)
+  /** One of Identifier, Name, or Complex Type (Nullable, Intersection, Union, or DNF)
+    *
+    * PHP 8.2 adds support for DNF (Disjunctive Normal Form) types like (A&B)|null
+    * which are unions containing intersection types.
     */
-  private def readType(json: Value): PhpNameExpr = {
+  private def readType(json: Value): PhpNameExpr = readTypeInternal(json, inUnion = false)
+
+  /** Internal type reader that tracks whether we're inside a union type.
+    * This is needed for DNF (PHP 8.2) where intersection types inside unions need parentheses.
+    */
+  private def readTypeInternal(json: Value, inUnion: Boolean): PhpNameExpr = {
     json match {
       case Obj(value) if value.get("nodeType").map(_.str).contains("NullableType") =>
-        val containedName = readType(value("type")).name
+        val containedName = readTypeInternal(value("type"), inUnion = false).name
         PhpNameExpr(s"?$containedName", attributes = PhpAttributes(json))
 
       case Obj(value) if value.get("nodeType").map(_.str).contains("IntersectionType") =>
-        val names = value("types").arr.map(readName).map(_.name)
-        PhpNameExpr(names.mkString("&"), PhpAttributes(json))
+        val names = value("types").arr.map(readTypeInternal(_, inUnion = false)).map(_.name)
+        // Only wrap in parentheses when inside a union type (DNF support for PHP 8.2)
+        val typeName = if (inUnion) s"(${names.mkString("&")})" else names.mkString("&")
+        PhpNameExpr(typeName, PhpAttributes(json))
 
       case Obj(value) if value.get("nodeType").map(_.str).contains("UnionType") =>
-        val names = value("types").arr.map(readType).map(_.name)
+        // Read union members with inUnion=true so intersection types get parentheses
+        val names = value("types").arr.map(readTypeInternal(_, inUnion = true)).map(_.name)
         PhpNameExpr(names.mkString("|"), PhpAttributes(json))
 
       case other => readName(other)

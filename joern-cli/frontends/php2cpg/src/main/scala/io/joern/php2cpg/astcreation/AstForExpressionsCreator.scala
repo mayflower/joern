@@ -49,9 +49,10 @@ trait AstForExpressionsCreator(implicit withSchemaValidation: ValidationMode) { 
       case propertyFetchExpr: PhpPropertyFetchExpr     => astForPropertyFetchExpr(propertyFetchExpr)
       case includeExpr: PhpIncludeExpr                 => astForIncludeExpr(includeExpr)
       case shellExecExpr: PhpShellExecExpr             => astForShellExecExpr(shellExecExpr)
+      case unhandled: PhpUnhandledExpr                 => Ast(unknownNode(unhandled, unhandled.nodeType))
       case null =>
         logger.warn("expr was null")
-        ???
+        Ast()
       case other => throw new NotImplementedError(s"unexpected expression '$other' of type ${other.getClass}")
     }
   }
@@ -163,12 +164,19 @@ trait AstForExpressionsCreator(implicit withSchemaValidation: ValidationMode) { 
         val operatorName = assignment.assignOp
 
         val targetAst = astForExpr(assignment.target)
-        val sourceAst = astForExpr(assignment.source)
 
-        // TODO Handle ref assigns properly (if needed).
-        val refSymbol = if (assignment.isRefAssign) "&" else ""
-        val symbol    = operatorSymbols.getOrElse(assignment.assignOp, assignment.assignOp)
-        val code      = s"${targetAst.rootCodeOrEmpty} $symbol $refSymbol${sourceAst.rootCodeOrEmpty}"
+        // For reference assignments ($a = &$b), wrap the source in an addressOf operator
+        val sourceAst = if (assignment.isRefAssign) {
+          val innerSourceAst = astForExpr(assignment.source)
+          val refCode        = s"&${innerSourceAst.rootCodeOrEmpty}"
+          val addressOfNode  = operatorCallNode(assignment.source, refCode, Operators.addressOf, None)
+          callAst(addressOfNode, innerSourceAst :: Nil)
+        } else {
+          astForExpr(assignment.source)
+        }
+
+        val symbol = operatorSymbols.getOrElse(assignment.assignOp, assignment.assignOp)
+        val code   = s"${targetAst.rootCodeOrEmpty} $symbol ${sourceAst.rootCodeOrEmpty}"
 
         val callNode = operatorCallNode(assignment, code, operatorName, None)
         callAst(callNode, List(targetAst, sourceAst))
@@ -355,7 +363,7 @@ trait AstForExpressionsCreator(implicit withSchemaValidation: ValidationMode) { 
       case simpleScalar: PhpSimpleScalar => Ast(literalNode(scalar, simpleScalar.value, simpleScalar.typeFullName))
       case null =>
         logger.warn("scalar was null")
-        ???
+        Ast(literalNode(scalar, "null", TypeConstants.NullType))
     }
   }
 
@@ -456,18 +464,28 @@ trait AstForExpressionsCreator(implicit withSchemaValidation: ValidationMode) { 
   }
 
   private def astForVariableExpr(variable: PhpVariable): Ast = {
-    // TODO Need to figure out variable variables. Maybe represent as some kind of call?
-    val valueAst = astForExpr(variable.value)
+    variable.value match {
+      case nameExpr: PhpNameExpr =>
+        // Regular variable: $foo
+        val identifier = identifierNode(variable, nameExpr.name, s"$$${nameExpr.name}", Defines.Any)
+        line(variable).foreach(identifier.lineNumber(_))
+        val declaringNode = handleVariableOccurrence(variable, identifier.name)
+        Ast(identifier).withRefEdges(identifier, List(declaringNode))
 
-    valueAst.root.collect { case root: ExpressionNew =>
-      root.code = s"$$${root.code}"
+      case innerVar: PhpVariable =>
+        // Variable variable: $$foo - create operator call to represent indirect access
+        val innerAst = astForVariableExpr(innerVar)
+        val code     = s"$$${innerAst.rootCodeOrEmpty}"
+        val callNode = operatorCallNode(variable, code, PhpOperators.variableVariable, Some(Defines.Any))
+        callAst(callNode, innerAst :: Nil)
+
+      case other =>
+        // Dynamic variable name from expression: ${expr}
+        val exprAst  = astForExpr(other)
+        val code     = s"$${${exprAst.rootCodeOrEmpty}}"
+        val callNode = operatorCallNode(variable, code, PhpOperators.variableVariable, Some(Defines.Any))
+        callAst(callNode, exprAst :: Nil)
     }
-
-    valueAst.root.collect { case root: NewIdentifier =>
-      root.lineNumber = line(variable)
-    }
-
-    valueAst
   }
 
   private def astForNameExpr(expr: PhpNameExpr): Ast = {
