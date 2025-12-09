@@ -29,13 +29,13 @@ object Domain {
     // TODO Decide which of these should be moved to codepropertygraph
     val variableVariable = "<operator>.variableVariable"
     val coalesceOp       = "<operator>.coalesce"
-    val concatOp       = "<operator>.concat"
-    val identicalOp    = "<operator>.identical"
-    val logicalXorOp   = "<operator>.logicalXor"
-    val notIdenticalOp = "<operator>.notIdentical"
-    val spaceshipOp    = "<operator>.spaceship"
-    val elvisOp        = "<operator>.elvis"
-    val unpack         = "<operator>.unpack"
+    val concatOp         = "<operator>.concat"
+    val identicalOp      = "<operator>.identical"
+    val logicalXorOp     = "<operator>.logicalXor"
+    val notIdenticalOp   = "<operator>.notIdentical"
+    val spaceshipOp      = "<operator>.spaceship"
+    val elvisOp          = "<operator>.elvis"
+    val unpack           = "<operator>.unpack"
     // Used for $array[] = $var type assignments
     val emptyArrayIdx = "<operator>.emptyArrayIdx"
     val errorSuppress = "<operator>.errorSuppress"
@@ -1446,13 +1446,13 @@ object Domain {
 
   /** One of Identifier, Name, or Complex Type (Nullable, Intersection, Union, or DNF)
     *
-    * PHP 8.2 adds support for DNF (Disjunctive Normal Form) types like (A&B)|null
-    * which are unions containing intersection types.
+    * PHP 8.2 adds support for DNF (Disjunctive Normal Form) types like (A&B)|null which are unions containing
+    * intersection types.
     */
   private def readType(json: Value): PhpNameExpr = readTypeInternal(json, inUnion = false)
 
-  /** Internal type reader that tracks whether we're inside a union type.
-    * This is needed for DNF (PHP 8.2) where intersection types inside unions need parentheses.
+  /** Internal type reader that tracks whether we're inside a union type. This is needed for DNF (PHP 8.2) where
+    * intersection types inside unions need parentheses.
     */
   private def readTypeInternal(json: Value, inUnion: Boolean): PhpNameExpr = {
     json match {

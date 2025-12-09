@@ -11,16 +11,16 @@ import io.shiftleft.semanticcpg.language.*
 
 /** Sets all untyped AST nodes to `Defines.Any` as a fallback.
   *
-  * Note: This is a legacy pass that provides a blanket fallback for nodes without explicit types.
-  * For proper type inference, use `PhpTypeRecoveryPassGenerator` from the post-processing passes
-  * in `io.joern.x2cpg.frontendspecific.php2cpg`. The type recovery pass handles:
+  * Note: This is a legacy pass that provides a blanket fallback for nodes without explicit types. For proper type
+  * inference, use `PhpTypeRecoveryPassGenerator` from the post-processing passes in
+  * `io.joern.x2cpg.frontendspecific.php2cpg`. The type recovery pass handles:
   *   - Literal type inference (int, string, etc.)
   *   - Object instantiation types
   *   - Method return type propagation
   *   - Type hints from parameters and return types
   *
-  * This pass runs before `TypeNodePass` to ensure all nodes have a type full name set,
-  * which is required for proper TYPE node creation.
+  * This pass runs before `TypeNodePass` to ensure all nodes have a type full name set, which is required for proper
+  * TYPE node creation.
   */
 class AnyTypePass(cpg: Cpg) extends ForkJoinParallelCpgPass[AstNode](cpg) {
 
