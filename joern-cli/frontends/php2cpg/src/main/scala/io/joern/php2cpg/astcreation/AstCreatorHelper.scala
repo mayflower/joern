@@ -243,8 +243,8 @@ trait AstCreatorHelper(disableFileContent: Boolean)(implicit withSchemaValidatio
       .getOrElse(call.methodName match {
         case nameExpr: PhpNameExpr => nameExpr.name
         case other =>
-          logger.error(s"Found unexpected call target type: Crash for now to handle properly later: $other")
-          ???
+          logger.warn(s"Found unexpected call target type: $other")
+          NameConstants.Unknown
       })
       .split("\\\\") // call names may be fully qualified
       .last

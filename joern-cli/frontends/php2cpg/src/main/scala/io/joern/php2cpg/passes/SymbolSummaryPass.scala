@@ -113,16 +113,15 @@ object SymbolSummaryPass {
       *   the outcome of the comparison.
       */
     def compare(that: SymbolSummary): Int = {
-      val typeOrder = (this, that) match {
-        case (_: PhpNamespace, _: PhpFunction) => 1
-        case (_: PhpNamespace, _: PhpClass)    => 1
-        case (_: PhpFunction, _: PhpClass)     => 1
-        case (_: PhpFunction, _: PhpNamespace) => -1
-        case (_: PhpClass, _: PhpNamespace)    => -1
-        case (_: PhpClass, _: PhpFunction)     => -1
-        case _                                 => 0
+      // Order: Class (0) < Function (1) < Constant (2) < Namespace (3)
+      def typeRank(s: SymbolSummary): Int = s match {
+        case _: PhpClass     => 0
+        case _: PhpFunction  => 1
+        case _: PhpConstant  => 2
+        case _: PhpNamespace => 3
       }
 
+      val typeOrder = typeRank(this) - typeRank(that)
       if (typeOrder != 0) typeOrder
       else this.name.compare(that.name)
     }
@@ -134,5 +133,7 @@ object SymbolSummaryPass {
   case class PhpFunction(name: String) extends SymbolSummary
 
   case class PhpClass(name: String) extends SymbolSummary
+
+  case class PhpConstant(name: String) extends SymbolSummary
 
 }

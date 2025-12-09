@@ -340,15 +340,16 @@ trait AstForControlStructuresCreator(implicit withSchemaValidation: ValidationMo
   }
 
   protected def astForYieldFromExpr(expr: PhpYieldFromExpr): Ast = {
-    // TODO This is currently only distinguishable from yield by the code field. Decide whether to treat YIELD_FROM
-    //  separately or whether to lower this to a foreach with regular yields.
+    // Use parserTypeName "YIELD_FROM" to distinguish from regular YIELD in queries
+    // The controlStructureType remains YIELD for compatibility
     val exprAst = astForExpr(expr.expr)
 
     val code = s"yield from ${exprAst.rootCodeOrEmpty}"
 
-    val yieldNode = controlStructureNode(expr, ControlStructureTypes.YIELD, code)
+    val yieldFromNode = controlStructureNode(expr, ControlStructureTypes.YIELD, code)
+      .parserTypeName("YIELD_FROM")
 
-    Ast(yieldNode)
+    Ast(yieldFromNode)
       .withChild(exprAst)
   }
 

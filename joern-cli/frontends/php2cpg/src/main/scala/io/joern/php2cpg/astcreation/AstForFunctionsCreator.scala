@@ -64,10 +64,11 @@ trait AstForFunctionsCreator(implicit withSchemaValidation: ValidationMode) { th
 
     // Create method for closure
     val name = PhpNameExpr(methodName, closureExpr.attributes)
-    // TODO Check for static modifier
+    // Static closures cannot capture $this - they prevent implicit binding of $this
+    // The STATIC modifier is added to the method modifiers to track this
     val modifiers = ModifierTypes.LAMBDA :: (if (closureExpr.isStatic) ModifierTypes.STATIC :: Nil else Nil)
     // Static closures exist, but this only affects captures. They are always called dynamically, so treat them
-    // as class methods.
+    // as class methods for type binding purposes.
     val isClassMethod = true
     val methodDecl = PhpMethodDecl(
       name,
