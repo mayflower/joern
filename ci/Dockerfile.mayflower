@@ -53,8 +53,8 @@ RUN microdnf install -y \
         python3 python3-devel \
         # C/C++ support (for c2cpg - headers and compiler)
         gcc gcc-c++ \
-        # Tools
-        git-core pcre2 which tar zip unzip sudo curl \
+        # Tools (curl-minimal already in base image)
+        git-core pcre2 which tar zip unzip sudo \
         ncurses jq zlib graphviz \
         glibc-common glibc-all-langpacks \
     && microdnf clean all \
