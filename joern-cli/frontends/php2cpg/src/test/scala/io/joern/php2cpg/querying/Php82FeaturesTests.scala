@@ -85,7 +85,7 @@ class Php82FeaturesTests extends PhpCode2CpgFixture {
       // The test verifies the property exists and the code is correctly parsed
       inside(cpg.typeDecl.name("Test").member.name("data").l) { case List(dataMember) =>
         dataMember.name shouldBe "data"
-        // Type recovery would set this properly in post-processing
+      // Type recovery would set this properly in post-processing
       }
     }
 

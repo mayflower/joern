@@ -37,7 +37,6 @@ class OperatorTests extends PhpCode2CpgFixture {
     "have the correct method names set" in {
       val testData = List(
         ("$a = $b", Operators.assignment),
-        ("$a = &$b", Operators.assignment),
         ("$a &= $b", Operators.assignmentAnd),
         ("$a |= $b", Operators.assignmentOr),
         ("$a ^= $b", Operators.assignmentXor),
@@ -63,6 +62,27 @@ class OperatorTests extends PhpCode2CpgFixture {
         cpg.call.name.l shouldBe expectedType :: Nil
         cpg.call.methodFullName.l shouldBe expectedType :: Nil
         cpg.call.code.l shouldBe testCode :: Nil
+      }
+    }
+
+    "handle assignment by reference correctly" in {
+      // $a = &$b now produces both assignment and addressOf calls
+      val cpg = code("""<?php
+        |$a = &$b;
+        |""".stripMargin)
+
+      cpg.call.nameExact(Operators.assignment).l match {
+        case List(assignment) =>
+          assignment.methodFullName shouldBe Operators.assignment
+          assignment.code shouldBe "$a = &$b"
+        case other => fail(s"Expected single assignment call, got: $other")
+      }
+
+      cpg.call.nameExact(Operators.addressOf).l match {
+        case List(addressOf) =>
+          addressOf.methodFullName shouldBe Operators.addressOf
+          addressOf.code shouldBe "&$b"
+        case other => fail(s"Expected single addressOf call, got: $other")
       }
     }
   }

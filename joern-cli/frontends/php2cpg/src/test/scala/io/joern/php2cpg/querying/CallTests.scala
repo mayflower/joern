@@ -174,21 +174,24 @@ class CallTests extends PhpCode2CpgFixture {
         |$$f->{$foo}($x);
         |""".stripMargin)
 
-    inside(cpg.call.filter(_.name != Operators.fieldAccess).l) { case List(fooCall) =>
-      fooCall.name shouldBe "$foo"
-      fooCall.methodFullName shouldBe """<unresolvedNamespace>.$foo"""
-      fooCall.dispatchType shouldBe DispatchTypes.DYNAMIC_DISPATCH
-      fooCall.lineNumber shouldBe Some(2)
-      fooCall.code shouldBe "$$f->$foo($x)"
+    // Filter out fieldAccess and variableVariable operators to get the actual method call
+    inside(cpg.call.filter(c => c.name != Operators.fieldAccess && !c.name.contains("variableVariable")).l) {
+      case List(fooCall) =>
+        fooCall.name shouldBe "$foo"
+        fooCall.methodFullName shouldBe """<unresolvedNamespace>.$foo"""
+        fooCall.dispatchType shouldBe DispatchTypes.DYNAMIC_DISPATCH
+        fooCall.lineNumber shouldBe Some(2)
+        fooCall.code shouldBe "$$f->$foo($x)"
 
-      inside(fooCall.argument.l) { case List(fRecv: Identifier, xArg: Identifier) =>
-        fRecv.name shouldBe "f"
-        fRecv.code shouldBe "$$f"
-        fRecv.lineNumber shouldBe Some(2)
+        inside(fooCall.argument.l) { case List(fRecv: Call, xArg: Identifier) =>
+          // $$f is now represented as a variableVariable call
+          fRecv.name shouldBe "<operator>.variableVariable"
+          fRecv.code shouldBe "$$f"
+          fRecv.lineNumber shouldBe Some(2)
 
-        xArg.name shouldBe "x"
-        xArg.code shouldBe "$x"
-      }
+          xArg.name shouldBe "x"
+          xArg.code shouldBe "$x"
+        }
     }
   }
 

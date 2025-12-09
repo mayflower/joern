@@ -151,7 +151,7 @@ class Php8FeaturesTests extends PhpCode2CpgFixture {
 
       inside(cpg.typeDecl.name("Foo").member.name("number").l) { case List(numberMember) =>
         numberMember.name shouldBe "number"
-        // Member types go through AnyTypePass; type recovery handles proper inference
+      // Member types go through AnyTypePass; type recovery handles proper inference
       }
     }
   }

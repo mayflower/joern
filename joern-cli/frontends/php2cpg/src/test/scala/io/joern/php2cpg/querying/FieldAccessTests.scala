@@ -49,16 +49,17 @@ class FieldAccessTests extends PhpCode2CpgFixture {
       |$$obj->$field;
       |""".stripMargin)
 
-    inside(cpg.call.l) { case List(fieldAccess) =>
+    inside(cpg.call.nameExact(Operators.fieldAccess).l) { case List(fieldAccess) =>
       fieldAccess.name shouldBe Operators.fieldAccess
       fieldAccess.methodFullName shouldBe Operators.fieldAccess
       fieldAccess.code shouldBe "$$obj->$field"
       fieldAccess.lineNumber shouldBe Some(2)
 
-      inside(fieldAccess.argument.l) { case List(objIdentifier: Identifier, fieldIdentifier: FieldIdentifier) =>
-        objIdentifier.name shouldBe "obj"
-        objIdentifier.code shouldBe "$$obj"
-        objIdentifier.lineNumber shouldBe Some(2)
+      inside(fieldAccess.argument.l) { case List(varVarCall: Call, fieldIdentifier: FieldIdentifier) =>
+        // $$obj is represented as a variableVariable operation
+        varVarCall.name shouldBe "<operator>.variableVariable"
+        varVarCall.code shouldBe "$$obj"
+        varVarCall.lineNumber shouldBe Some(2)
 
         fieldIdentifier.canonicalName shouldBe "field"
         fieldIdentifier.code shouldBe "$field"
