@@ -1444,20 +1444,31 @@ object Domain {
     }
   }
 
-  /** One of Identifier, Name, or Complex Type (Nullable, Intersection, or Union)
+  /** One of Identifier, Name, or Complex Type (Nullable, Intersection, Union, or DNF)
+    *
+    * PHP 8.2 adds support for DNF (Disjunctive Normal Form) types like (A&B)|null
+    * which are unions containing intersection types.
     */
-  private def readType(json: Value): PhpNameExpr = {
+  private def readType(json: Value): PhpNameExpr = readTypeInternal(json, inUnion = false)
+
+  /** Internal type reader that tracks whether we're inside a union type.
+    * This is needed for DNF (PHP 8.2) where intersection types inside unions need parentheses.
+    */
+  private def readTypeInternal(json: Value, inUnion: Boolean): PhpNameExpr = {
     json match {
       case Obj(value) if value.get("nodeType").map(_.str).contains("NullableType") =>
-        val containedName = readType(value("type")).name
+        val containedName = readTypeInternal(value("type"), inUnion = false).name
         PhpNameExpr(s"?$containedName", attributes = PhpAttributes(json))
 
       case Obj(value) if value.get("nodeType").map(_.str).contains("IntersectionType") =>
-        val names = value("types").arr.map(readName).map(_.name)
-        PhpNameExpr(names.mkString("&"), PhpAttributes(json))
+        val names = value("types").arr.map(readTypeInternal(_, inUnion = false)).map(_.name)
+        // Only wrap in parentheses when inside a union type (DNF support for PHP 8.2)
+        val typeName = if (inUnion) s"(${names.mkString("&")})" else names.mkString("&")
+        PhpNameExpr(typeName, PhpAttributes(json))
 
       case Obj(value) if value.get("nodeType").map(_.str).contains("UnionType") =>
-        val names = value("types").arr.map(readType).map(_.name)
+        // Read union members with inUnion=true so intersection types get parentheses
+        val names = value("types").arr.map(readTypeInternal(_, inUnion = true)).map(_.name)
         PhpNameExpr(names.mkString("|"), PhpAttributes(json))
 
       case other => readName(other)

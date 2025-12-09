@@ -239,7 +239,7 @@ class AstCreator(
           .name("TraitAlias")
           .fullName(s"${traitPart}$methodName")
         line(alias).foreach(annotationNode.lineNumber(_))
-        columnNumber(alias).foreach(annotationNode.columnNumber(_))
+        column(alias).foreach(annotationNode.columnNumber(_))
         Ast(annotationNode)
 
       case prec: PhpPrecedenceAdaptation =>
@@ -252,7 +252,7 @@ class AstCreator(
           .name("TraitPrecedence")
           .fullName(s"${prec.traitName.name}::${prec.methodName.name}")
         line(prec).foreach(annotationNode.lineNumber(_))
-        columnNumber(prec).foreach(annotationNode.columnNumber(_))
+        column(prec).foreach(annotationNode.columnNumber(_))
         Ast(annotationNode)
     }
 
